@@ -23,7 +23,7 @@ class PongEnv(gym.Env):
         self.screen_width = 800
         self.screen_height = 600
 
-        self.py0 = 250
+        self.py0 = 250      #paddle border coordinates
         self.py1 =350
         self.px0 = 40
         self.px1 = 60
@@ -32,7 +32,7 @@ class PongEnv(gym.Env):
         self.ball_y = 300
         self.ball_move_x = 9
         self.ball_move_y = 9
-        self.by0 = 290
+        self.by0 = 290      #ball border coordinates
         self.by1 = 310
         self.bx0 = 390
         self.bx1 = 410
@@ -43,14 +43,14 @@ class PongEnv(gym.Env):
 
         self.action_space = Discrete(3)
         self.observation_space = Box(low=np.array([
-            20,     #paddle y axis
-            0,      #ball x poz
-            0       #ball y poz
+            20,             #paddle y axis
+            0,              #ball x poz
+            0               #ball y poz
             ]),
             high=np.array([
-            580,    #paddle y axis
-            800,    #ball x poz
-            600     #ball y poz
+            580,            #paddle y axis
+            800,            #ball x poz
+            600             #ball y poz
             ]),
         )
 
