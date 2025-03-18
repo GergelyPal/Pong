@@ -48,7 +48,8 @@ class PongEnv(gym.Env):
         self.ball_radius = 10
 
         self.direction = 0  #0-3
-        self.current_poz = 300
+        self.position_agent1 = 300
+        self.position_agent2 = 300
         self.hit_back = False
         self.perfect_hit = False
 
@@ -64,19 +65,31 @@ class PongEnv(gym.Env):
 
     def reset(self, *, seed=None, options=None):
         random.seed(seed)
-        self.current_poz = 300
-        return np.array([self.current_poz, self.ball_x, self.ball_y], np.float32), {"env_state": "reset"}
+        self.position_agent1 = 300
+        self.position_agent2 = 300
+        return np.array([self.position_agent1, self.action_space_agent2, self.ball_x, self.ball_y], np.float32), {"env_state": "reset"}
 
-    def step(self, action):
-        assert action in [0, 1, 2], action
+    def step(self, action_agent1, action_agent2):
+        assert action_agent1 in [0, 1, 2], action_agent1
+        assert action_agent2 in [0, 1, 2], action_agent2
         #move up
-        if(action == 1 and self.current_poz > 20):
+        if(action_agent1 == 1 and self.current_poz > 20):
             self.current_poz -= 40
-            #print("Moved up")
+            #print("Agent1 Moved up")
         #move down
-        elif(action == 2 and self.current_poz < 580):
+        elif(action_agent1 == 2 and self.current_poz < 580):
             self.current_poz += 40
-            #print("Moved down")
+            #print("Agent1 Moved down")
+
+        #move up
+        if(action_agent2 == 1 and self.current_poz > 20):
+            self.current_poz -= 40
+            #print("Agent2 Moved up")
+        #move down
+        elif(action_agent2 == 2 and self.current_poz < 580):
+            self.current_poz += 40
+            #print("Agent2 Moved down")
+
         self.move_ball()
 
         terminated = self.hit_back == True
@@ -98,7 +111,7 @@ class PongEnv(gym.Env):
    
         self.perfect_hit = False
         self.hit_back = False
-        infos = {"rewarded": reward}
+        infos = {}
         
         return (
             np.array([self.current_poz, self.ball_x, self.ball_y], np.float32),
