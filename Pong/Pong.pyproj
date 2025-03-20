@@ -4,7 +4,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>1ae646d8-9c55-4469-a156-d5e2dd3f6c92</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>Pong.py</StartupFile>
+    <StartupFile>TwoAgentPong.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>

@@ -1,7 +1,7 @@
 
 from pickletools import bytes1
-import gymnasium as gym
-from gymnasium.spaces import Discrete, Box, Dict
+from ray.rllib.env.multi_agent_env import MultiAgentEnv
+from gymnasium.spaces import Discrete, Box, MultiDiscrete
 import numpy as np
 import random
 from ray import tune
@@ -31,10 +31,11 @@ parser.add_argument(
     help="Total number of iters."
 )
 
-class PongEnv(gym.Env):
+class PongEnv(MultiAgentEnv):
     def __init__(self, config: Optional[dict] = None):
         config = config or {}
-        
+        self.agents = self.possible_agents = ["player1", "player2"]
+
         self.screen_width = 800
         self.screen_height = 600
 
@@ -44,70 +45,91 @@ class PongEnv(gym.Env):
         self.ball = [400,300]
         self.ball_move = [10, 10]
         self.ball_radius = 10
-
         self.direction = 0  #0-3
+
         self.position_agent1 = 300
         self.position_agent2 = 300
         self.hit_back = False
         self.perfect_hit = False
         self.ballEventSource = -1  # which agent's side is the ball on currently
 
-        self.rewards = {'agent1': 0,'agent2': 0},
-
         self.ball_out_of_bounds = False
         
-        self.action_space_agent1 = Discrete(3)
-        self.action_space_agent2 = Discrete(3)
-        self.observation_space = Dict(
-            {
-            'paddle_height': Box(0, self.screen_height, shape=(2,), dtype=np.float32),
-            'ball_position': Box([0,0], [self.screen_width, self.screen_height], shape=(2,), dtype=np.float32)
-            })
+        self.action_space = MultiDiscrete([3, 3])
+
+        self.observation_space = Box(low=np.array([
+            0,             #agent1 paddle y axis
+            0,             #agent2 paddle y axis
+            0,             #ball x poz
+            0              #ball y poz
+            ]),
+            high=np.array([
+            self.screen_height,            #agent1 paddle y axis
+            self.screen_height,            #agent2 paddle y axis
+            self.screen_width,             #ball x poz
+            self.screen_height             #ball y poz
+            ]),
+        )
+
 
     def reset(self, *, seed=None, options=None):
         random.seed(seed)
         self.position_agent1 = 300
         self.position_agent2 = 300
-        return np.array([self.position_agent1, self.action_space_agent2, self.ball[0], self.ball[1]], np.float32), {"env_state": "reset"}
+        self.reset_ball()
+        observation ={
+            "agent1": np.array([self.position_agent1, self.position_agent2, self.ball[0], self.ball[1]], np.float32),
+            "agent2": np.array([self.position_agent1, self.position_agent2, self.ball[0], self.ball[1]], np.float32)
+        }
+        return np.array([self.position_agent1, self.position_agent2, self.ball[0], self.ball[1]], np.float32), {"env_state": "reset"}
+       #return {
+       #    "agent1": np.array([self.position_agent1, self.position_agent2, self.ball[0], self.ball[1]], np.float32),
+       #    "agent2": np.array([self.position_agent1, self.position_agent2, self.ball[0], self.ball[1]], np.float32)
+       #}, {}
 
-    def step(self, action_agent1, action_agent2):
-        assert action_agent1 in [0, 1, 2], action_agent1
-        assert action_agent2 in [0, 1, 2], action_agent2
-        
+    def step(self, action_dict):
+        #assert action in [0, 1, 2], action
+        print("action_dict:", action_dict)
+        action_agent1 = action_dict[0]
+        action_agent2 = action_dict[1]
+
+
         if(action_agent1 == 1 and self.position_agent1 > 20):
-            self.current_poz -= 40
+            self.position_agent1 -= 40
             #print("Agent1 Moved up")       
         elif(action_agent1 == 2 and self.position_agent1< self.screen_height - 20):
-            self.current_poz += 40
+            self.position_agent1 += 40
             #print("Agent1 Moved down")
 
         if(action_agent2 == 1 and self.position_agent2 > 20):
-            self.current_poz -= 40
+            self.position_agent2 -= 40
             #print("Agent2 Moved up")
         elif(action_agent2 == 2 and self.position_agent2 < self.screen_height - 20):
-            self.current_poz += 40
+            self.position_agent2 += 40
             #print("Agent2 Moved down")
 
         self.move_ball()
 
         terminated = self.hit_back == True
         truncated = False
-
+        rewards = {"agent1": 0, "agent2": 0}
         if(self.ballEventSource == 1):
-            self.rewards["agent1"] = self.calcReward()
+            rewards["agent1"] = self.calcReward()
         elif (self.ballEventSource == 2):
-            self.rewards["agent2"] = self.calcReward()
+            rewards["agent2"] = self.calcReward()
    
         self.perfect_hit = False
         self.hit_back = False
+        observations = {
+                'agent1': np.array([self.position_agent1, self.position_agent2, self.ball[0], self.ball[1]], np.float32),
+                'agent2': np.array([self.position_agent2, self.position_agent1, self.ball[0], self.ball[1]], np.float32),
+        }
+
         infos = {}
         
         return (
-            np.array([self.position_agent1, self.action_space_agent2, self.ball_x, self.ball_y], np.float32),
-            {
-            'agent1 reward': self.rewards["agent1"],
-            'agent2 reward': self.rewards["agent2"]
-            },
+            observations,
+            rewards,
             terminated,
             truncated,
             infos,
@@ -150,6 +172,9 @@ class PongEnv(gym.Env):
         if(self.direction == 0):
             self.direction = 3
         else: self.direction = 2
+        self.hit_back = True
+        if(abs(self.ball_y - self.current_poz) <= 20):
+            self.perfect_hit = True
 
     def collision_left(self):
         if(self.direction == 3):
@@ -202,16 +227,14 @@ class PongEnv(gym.Env):
 
         if(collided == False):
             if(bx0 - x < 0 or bx0 + x > self.screen_width):          
-                self.ball_out_of_bounds = True
-                self.reset_ball()
-            elif(bx1 + x > self.screen_width):
-                self.collision_right()
+                self.ball_out_of_bounds = True            
             elif(by0 - y < 0):
                 self.collision_top()
             elif(by1 + y > self.screen_height):
                 self.collision_bottom()
-        else:
+        elif(self.ballEventSource == 1):
             self.collision_left()
+        else: self.collision_right()
 
         if(self.direction == 0):
             y = -y
@@ -225,8 +248,8 @@ class PongEnv(gym.Env):
         self.ball[1] += y
 
     def reset_ball(self):
-        rand = random.randint(0, 1)
-        if(rand == 0):              #left side ball spawn
+        rand = random.randint(1, 2)
+        if(rand == 1):              #left side ball spawn
             self.direction  = random.randint(0, 1)
             self.ball[0] = 80
         else:
@@ -268,6 +291,8 @@ if __name__ == "__main__":
     base_config["framework"] = "torch"  # Or "tf" depending on your setup
     base_config["num_gpus"] = 0  # Set to 1 if you have a GPU and want to use it
     base_config["callbacks"] = MyCallbacks
+    base_config["_disable_preprocessor_api"] = False
+    base_config["multiagent"] = 
 
     stopping_criteria = {
         "num_env_steps_sampled_lifetime": args.default_timesteps,
