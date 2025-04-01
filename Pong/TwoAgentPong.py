@@ -287,12 +287,12 @@ if __name__ == "__main__":
         )
     )
     # Customize base config further (like number of workers, GPUs, etc.)
-    base_config["num_workers"] = 1  # Adjust based on resources
+    base_config["num_workers"] = 2  # Adjust based on resources
     base_config["framework"] = "torch"  # Or "tf" depending on your setup
     base_config["num_gpus"] = 0  # Set to 1 if you have a GPU and want to use it
     base_config["callbacks"] = MyCallbacks
     base_config["_disable_preprocessor_api"] = False
-    base_config["multiagent"] = 
+    #base_config["multiagent"] = True
 
     stopping_criteria = {
         "num_env_steps_sampled_lifetime": args.default_timesteps,

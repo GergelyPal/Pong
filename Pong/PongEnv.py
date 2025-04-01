@@ -54,15 +54,16 @@ class PongEnv(gym.Env):
         self.ball_out_of_bounds = False
 
         self.action_space = Discrete(3)
-        self.observation_space = Box(low=np.array([
-            20,             #paddle y axis
-            0,              #ball x poz
-            0              #ball y poz
+        self.observation_space = Box(
+            low=np.array([
+            20,                 #paddle y axis
+            0,                  #ball x poz
+            0                   #ball y poz
             ]),
             high=np.array([
-            580,            #paddle y axis
-            800,            #ball x poz
-            600             #ball y poz
+            580,                #paddle y axis
+            self.screen_width,  #ball x poz
+            self.screen_height  #ball y poz
             ]),
         )
 
@@ -211,22 +212,18 @@ class MyCallbacks(RLlibCallback):
 
 if __name__ == "__main__":
     args = parser.parse_args()
-
-    # Can also register the env creator function explicitly with:
     register_env("pong-env", lambda config: PongEnv())
 
     base_config = (
         get_trainable_cls(args.algo)
         .get_default_config()
         .environment(
-            PongEnv,  # or provide the registered string: "corridor-env"
-            #env_config={"corridor_length": args.corridor_length},
+            PongEnv
         )
     )
-    # Customize base config further (like number of workers, GPUs, etc.)
-    base_config["num_workers"] = 1  # Adjust based on resources
-    base_config["framework"] = "torch"  # Or "tf" depending on your setup
-    base_config["num_gpus"] = 0  # Set to 1 if you have a GPU and want to use it
+    base_config["num_workers"] = 1
+    base_config["framework"] = "torch"
+    base_config["num_gpus"] = 0
     base_config["callbacks"] = MyCallbacks
 
     stopping_criteria = {
@@ -240,7 +237,7 @@ if __name__ == "__main__":
         "PPO",
         config=base_config,
         stop=stopping_criteria,
-        checkpoint_at_end=True  # Ensures a checkpoint is saved at the end of training
+        checkpoint_at_end=True
     )
 
     run_rllib_example_script_experiment(base_config, args)
